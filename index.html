@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gravity Simulator</title>
+    <link rel="stylesheet" href="./src/styles.css">
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="scene" aria-label="3D gravity simulation"></canvas>
+      <section id="sidebar" aria-label="Simulation controls">
+        <header>
+          <h1>Gravity Simulator</h1>
+          <p id="modeLabel">Camera mode</p>
+        </header>
+
+        <div class="panel">
+          <h2>Presets</h2>
+          <select id="presetSelect"></select>
+          <p id="presetMeta"></p>
+          <button id="loadPreset">Load Preset</button>
+        </div>
+
+        <div class="panel">
+          <h2>Simulation</h2>
+          <div class="row">
+            <button id="pauseButton">Pause</button>
+            <button id="resetButton">Reset</button>
+          </div>
+          <label><input id="trailToggle" type="checkbox" checked> Trails [T]</label>
+          <label><input id="fabricToggle" type="checkbox" checked> Fabric grid [V]</label>
+          <label><input id="heatmapToggle" type="checkbox"> Heatmap [Y]</label>
+          <label><input id="hideHeatmapBaseToggle" type="checkbox"> Hide blue base</label>
+          <label><input id="wavesToggle" type="checkbox" checked> Visual waves</label>
+          <label><input id="collisionsToggle" type="checkbox" checked> Collision fusion</label>
+          <label>Time scale <input id="timeScale" type="text" value="0.45"></label>
+          <div class="row">
+            <button id="sideViewButton">Side View</button>
+            <button id="upwardViewButton">Upward View</button>
+          </div>
+          <button id="topViewButton">Top View</button>
+        </div>
+
+        <div class="panel">
+          <h2>Spawn</h2>
+          <label>Unit mode
+            <select id="unitMode">
+              <option value="normalized">Normalized</option>
+              <option value="si">SI inputs</option>
+            </select>
+          </label>
+          <label>Type
+            <select id="spawnType">
+              <option value="star">Star</option>
+              <option value="planet" selected>Planet</option>
+              <option value="particle">Particle</option>
+              <option value="white_dwarf">White dwarf</option>
+              <option value="neutron_star">Neutron star</option>
+            </select>
+          </label>
+          <label>Mass <input id="spawnMass" type="text" value="0.001"></label>
+          <label>Density <input id="spawnDensity" type="text" value="5"></label>
+          <label>Radius <input id="spawnRadius" type="text" value="0.025"></label>
+          <label>Velocity toward camera <input id="spawnVelocity" type="text" value="1.0"></label>
+          <button id="spawnButton">Spawn At Camera</button>
+        </div>
+
+        <div class="panel">
+          <h2>Selected Body</h2>
+          <pre id="selectedStats">Click a body in cursor mode.</pre>
+        </div>
+
+        <footer>
+          <span id="fpsLabel">FPS --</span>
+          <span id="countLabel">0 bodies</span>
+        </footer>
+      </section>
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
