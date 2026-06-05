@@ -189,9 +189,7 @@ export class Renderer {
     if (settings.heatmap) {
       const layers = buildFabricLayers(state.bodies, settings, state.time);
       gl.depthMask(false);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
       this.drawTriangles(layers.surface, matrix, 1);
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       gl.depthMask(true);
       if (settings.showFabric) this.drawLines(layers.grid, matrix, 1);
     } else if (settings.showFabric) {
@@ -338,7 +336,7 @@ export function buildFabricLayers(bodies, settings, time) {
     ...settings,
     heatmap: false,
     gridLayerOffset: settings.gridLayerOffset ?? 0,
-    gridAlpha: settings.gridAlpha ?? 0.34,
+    gridAlpha: settings.gridAlpha ?? 0.22,
   }, time);
   grid.overlay = true;
   return {
@@ -350,9 +348,10 @@ export function buildFabricLayers(bodies, settings, time) {
 function heatmapAlphaForVertex(vertex, grid, settings) {
   const baseAlpha = settings.heatmapAlpha ?? 0.9;
   if (!settings.hideHeatmapBase) return baseAlpha;
-  const visibility = vertex.fieldVisibility
-    ?? vertex.sceneHeat
-    ?? (Math.abs(vertex.y) / Math.max(grid.maxDepth, 1e-9));
+  const relativeDepth = Math.max(0, vertex.displayDepth ?? Math.abs(vertex.y)) / Math.max(grid.maxDisplayDepth ?? grid.maxDepth, 1e-9);
+  const visibility = grid.maxVisualMass <= 0.01
+    ? smoothstep(0.17, 0.46, relativeDepth)
+    : smoothstep(0.16, 0.55, relativeDepth);
   return baseAlpha * Math.max(0, Math.min(1, visibility));
 }
 

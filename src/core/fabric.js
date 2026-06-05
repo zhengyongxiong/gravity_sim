@@ -29,6 +29,8 @@ export function buildFabricGrid(bodies, settings) {
   const effectiveExposure = maxVisualMass > 0.01 ? Math.min(heatmapExposure, 20) : heatmapExposure;
   let minHeat = Infinity;
   let maxHeat = 0;
+  let maxRawDepth = 0;
+  let maxDisplayDepth = 0;
 
   for (let row = 0; row < resolution; row += 1) {
     const z = -half + row * step;
@@ -36,6 +38,7 @@ export function buildFabricGrid(bodies, settings) {
       const x = -half + column * step;
       const field = sampleFabricField(x, z, bodyFields, { strength, time, wavesEnabled });
       const depth = field.depth;
+      maxRawDepth = Math.max(maxRawDepth, depth);
       const heatValue = heatmapIntensity(depth, maxDepth, effectiveExposure);
       minHeat = Math.min(minHeat, heatValue);
       maxHeat = Math.max(maxHeat, heatValue);
@@ -48,7 +51,7 @@ export function buildFabricGrid(bodies, settings) {
         linearHeat: clamp(depth / Math.max(maxDepth, 1e-9), 0, 1),
         massTier: field.massTier,
         localVisibility: field.localVisibility,
-        color: heatmap ? heatColorForMassTier(field.massTier, heatValue) : { r: 115, g: 122, b: 130 },
+        color: { r: 115, g: 122, b: 130 },
       });
     }
   }
@@ -58,11 +61,13 @@ export function buildFabricGrid(bodies, settings) {
     vertex.sceneHeat = clamp((vertex.heat - minHeat) / heatRange, 0, 1);
     const bridgeVisibility = smoothstep(0.04, 0.34, vertex.sceneHeat) * (maxVisualMass > 0.01 ? 0.38 : 0.34);
     vertex.fieldVisibility = clamp(Math.max(vertex.localVisibility, bridgeVisibility), 0, 1);
-    vertex.displayDepth = visualDisplayDepth(vertex, maxVisualMass);
+    vertex.displayDepth = visualDisplayDepth(vertex, maxVisualMass, maxRawDepth);
+    maxDisplayDepth = Math.max(maxDisplayDepth, vertex.displayDepth);
     vertex.y = -vertex.displayDepth;
+    if (heatmap) vertex.color = heatColorForDepth(heatmapColorDepth(vertex, maxVisualMass), maxDepth);
   }
 
-  return { vertices, resolution, size, maxDepth, maxVisualMass, minHeat, maxHeat };
+  return { vertices, resolution, size, maxDepth, maxVisualMass, maxRawDepth, maxDisplayDepth, minHeat, maxHeat };
 }
 
 export function fabricDepthAt(x, z, bodies, settings = {}) {
@@ -133,7 +138,10 @@ function visualSofteningForBody(body, softening) {
   if (body.glow || body.type === BodyType.STAR || body.type === BodyType.NEUTRON_STAR || body.type === BodyType.WHITE_DWARF) {
     return Math.min(softening, Math.max(radius, softening * 0.12));
   }
-  return Math.min(softening, Math.max(radius * 0.35, softening * 0.03));
+  if (body.type === BodyType.PLANET) {
+    return Math.min(softening, Math.max(radius * 1.45, softening * 0.08));
+  }
+  return Math.min(softening, Math.max(radius * 0.45, softening * 0.03));
 }
 
 function visualWellRadiusForBody(body, step, softening, massTier) {
@@ -151,17 +159,20 @@ function bodyFieldVisibility(field, distanceSquared) {
   return radial * massWeight;
 }
 
-function visualDisplayDepth(vertex, maxVisualMass) {
+function visualDisplayDepth(vertex, maxVisualMass, maxRawDepth) {
   const rawDepth = Math.max(0, vertex.depth ?? 0);
-  const visibility = clamp(vertex.fieldVisibility ?? vertex.localVisibility ?? 0, 0, 1);
-  const massTier = clamp(vertex.massTier ?? 0, 0, 1);
   const weakSystem = maxVisualMass <= 0.01;
-  const visualScale = weakSystem
-    ? 0.29 + 0.46 * massTier
-    : 0.16 + 0.6 * massTier;
-  const cap = weakSystem ? 0.8 : 2.4;
 
-  return Math.min(cap, Math.max(rawDepth, visibility * visualScale));
+  if (!weakSystem) return Math.min(2.4, rawDepth);
+
+  const relativeDepth = rawDepth / Math.max(maxRawDepth, 1e-12);
+  return Math.min(0.8, Math.pow(relativeDepth, 0.42) * 0.72);
+}
+
+function heatmapColorDepth(vertex, maxVisualMass) {
+  return maxVisualMass <= 0.01
+    ? Math.max(0, vertex.displayDepth ?? 0) * 0.55
+    : Math.max(0, vertex.displayDepth ?? 0);
 }
 
 export function heatmapIntensity(depth, maxDepth, exposure = 1) {
@@ -211,28 +222,49 @@ export function heatColorForMassTier(tier, intensity = 1) {
 }
 
 export function heatColorForDepth(depth, maxDepth, exposure = 1) {
-  const t = heatmapIntensity(depth, maxDepth, exposure);
-  if (t < 0.42) {
-    const local = t / 0.42;
+  const normalizedDepth = (Math.max(0, depth) / Math.max(maxDepth, 1e-9)) * Math.max(1, exposure);
+  return heatColorForLevel(clamp(normalizedDepth, 0, 1));
+}
+
+function heatColorForLevel(level) {
+  const t = clamp(level, 0, 1);
+  if (t < 0.18) {
+    const local = t / 0.18;
     return {
-      r: Math.round(10 * local),
-      g: Math.round(55 + 200 * local),
+      r: Math.round(8 + 6 * local),
+      g: Math.round(34 + 96 * local),
       b: 255,
     };
   }
-  if (t < 0.72) {
-    const local = (t - 0.42) / 0.3;
+  if (t < 0.38) {
+    const local = (t - 0.18) / 0.2;
     return {
-      r: Math.round(20 + 235 * local),
-      g: 255,
-      b: Math.round(210 - 190 * local),
+      r: Math.round(14 + 18 * local),
+      g: Math.round(130 + 102 * local),
+      b: Math.round(255 - 165 * local),
     };
   }
-  const local = (t - 0.72) / 0.28;
+  if (t < 0.62) {
+    const local = (t - 0.38) / 0.24;
+    return {
+      r: Math.round(32 + 216 * local),
+      g: Math.round(232 + 16 * local),
+      b: Math.round(120 - 112 * local),
+    };
+  }
+  if (t < 0.82) {
+    const local = (t - 0.62) / 0.2;
+    return {
+      r: 255,
+      g: Math.round(248 - 108 * local),
+      b: 8,
+    };
+  }
+  const local = (t - 0.82) / 0.18;
   return {
     r: 255,
-    g: Math.round(220 - 180 * local),
-    b: Math.round(20 - 20 * local),
+    g: Math.round(140 - 122 * local),
+    b: Math.round(8 - 8 * local),
   };
 }
 

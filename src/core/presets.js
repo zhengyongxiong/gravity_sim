@@ -7,16 +7,16 @@ export function createPresets() {
       title: 'Earth and Moon',
       classification: 'stable planet-moon orbit',
       bodies: [
-        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 1, visualMass: 3e-6, radius: 0.08, density: 5, position: Vec3.zero(), velocity: new Vec3(0, -0.012, 0), color: [80, 140, 255] }),
-        createBody({ name: 'Moon', type: BodyType.PARTICLE, mass: 0.0123, visualMass: 3.7e-8, radius: 0.025, density: 3.3, position: new Vec3(1, 0, 0), velocity: new Vec3(0, 0, 0.9), color: [210, 210, 210] }),
+        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 1, visualMass: 3e-6, radius: 0.06, density: 5, position: Vec3.zero(), velocity: new Vec3(0, -0.004, 0), color: [80, 140, 255] }),
+        createBody({ name: 'Moon', type: BodyType.PARTICLE, mass: 0.0123, visualMass: 3.7e-8, radius: 0.018, density: 3.3, position: new Vec3(2.25, 0, 0), velocity: new Vec3(0, 0, 0.67), color: [210, 210, 210] }),
       ],
     },
     {
       title: 'Sun and Earth',
       classification: 'near circular two-body ellipse',
       bodies: [
-        createBody({ name: 'Sun', type: BodyType.STAR, mass: 1, visualMass: 1, radius: 0.12, density: 1.4, position: Vec3.zero(), velocity: Vec3.zero(), color: [255, 236, 180] }),
-        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 3e-6, visualMass: 3e-6, radius: 0.035, density: 5.5, position: new Vec3(1, 0, 0), velocity: new Vec3(0, 0, 1), color: [80, 140, 255] }),
+        createBody({ name: 'Sun', type: BodyType.STAR, mass: 1, visualMass: 1, radius: 0.16, density: 1.4, position: Vec3.zero(), velocity: Vec3.zero(), color: [255, 236, 180] }),
+        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 3e-6, visualMass: 0.06, radius: 0.035, density: 5.5, position: new Vec3(3.2, 0, 0), velocity: new Vec3(0, 0, 0.56), color: [80, 140, 255] }),
       ],
     },
     {

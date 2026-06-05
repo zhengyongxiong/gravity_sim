@@ -8,12 +8,12 @@ export const CameraView = {
 
 export function createCamera(options = {}) {
   return {
-    position: Vec3.from(options.position ?? new Vec3(0, 1.35, 6.6)),
+    position: Vec3.from(options.position ?? new Vec3(1.15, 1.05, 7.3)),
     yaw: options.yaw ?? 0,
-    pitch: options.pitch ?? -0.2,
+    pitch: options.pitch ?? -0.12,
     speed: options.speed ?? 3.5,
     sensitivity: options.sensitivity ?? 0.0025,
-    zoom: options.zoom ?? 50,
+    zoom: options.zoom ?? 45,
   };
 }
 
@@ -35,10 +35,10 @@ export function cameraForView(view) {
     });
   }
   return createCamera({
-    position: new Vec3(0, 1.35, 6.6),
+    position: new Vec3(1.15, 1.05, 7.3),
     yaw: 0,
-    pitch: -0.2,
-    zoom: 50,
+    pitch: -0.12,
+    zoom: 45,
   });
 }
 

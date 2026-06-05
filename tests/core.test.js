@@ -183,6 +183,19 @@ test('preset catalog includes required named scenarios with valid bodies', () =>
   }
 });
 
+test('solar and lunar presets use readable science-inspired spacing', () => {
+  const presets = createPresets();
+  const earthMoon = presets.find((preset) => preset.title === 'Earth and Moon').bodies;
+  const sunEarth = presets.find((preset) => preset.title === 'Sun and Earth').bodies;
+  const [earth, moon] = earthMoon;
+  const [sun, solarEarth] = sunEarth;
+
+  assert.ok(moon.position.sub(earth.position).length() > earth.radius * 30);
+  assert.ok(sun.position.sub(solarEarth.position).length() > sun.radius * 18);
+  assert.ok(sun.radius > solarEarth.radius * 3);
+  assert.ok(earth.radius > moon.radius * 2.5);
+});
+
 test('fabric superposes wells and heatmap moves from cool to hot with depth', () => {
   const bodies = [
     createBody({ name: 'A', type: BodyType.STAR, mass: 1, position: new Vec3(-1, 0, 0), radius: 0.1 }),
@@ -205,9 +218,103 @@ test('fabric superposes wells and heatmap moves from cool to hot with depth', ()
   assert.ok(heatColorForDepth(3, 3).r > heatColorForDepth(3, 3).b);
 });
 
+test('fabric heatmap depth uses constructive superposition', () => {
+  const settings = {
+    size: 4,
+    resolution: 17,
+    strength: 0.22,
+    softening: 0.12,
+    heatmap: true,
+    time: 0,
+    wavesEnabled: false,
+    heatmapReferenceDepth: 1.35,
+  };
+  const single = buildFabricGrid([
+    createBody({ name: 'A', type: BodyType.STAR, mass: 1, position: new Vec3(-0.5, 0, 0), radius: 0.08 }),
+  ], settings);
+  const paired = buildFabricGrid([
+    createBody({ name: 'A', type: BodyType.STAR, mass: 1, position: new Vec3(-0.5, 0, 0), radius: 0.08 }),
+    createBody({ name: 'B', type: BodyType.STAR, mass: 1, position: new Vec3(0.5, 0, 0), radius: 0.08 }),
+  ], settings);
+  const singleCenter = nearestFabricVertex(single, Vec3.zero());
+  const pairedCenter = nearestFabricVertex(paired, Vec3.zero());
+
+  assert.ok(pairedCenter.depth > singleCenter.depth * 1.8);
+  assert.ok(pairedCenter.color.r > singleCenter.color.r);
+  assert.ok(pairedCenter.color.b < singleCenter.color.b);
+});
+
+test('strong-system fabric display follows additive potential without visibility humps', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Sun and Earth');
+  const grid = buildFabricGrid(preset.bodies, {
+    size: 14,
+    resolution: 145,
+    strength: 0.22,
+    softening: 0.2,
+    heatmap: true,
+    time: 0,
+    wavesEnabled: false,
+    heatmapReferenceDepth: 0.9,
+  });
+  const earth = nearestFabricVertex(grid, new Vec3(3.2, 0, 0));
+  const shoulder = nearestFabricVertex(grid, new Vec3(2.8, 0, 0));
+
+  approx(earth.displayDepth, earth.depth, 1e-12);
+  approx(shoulder.displayDepth, shoulder.depth, 1e-12);
+});
+
+test('sun earth heatmap has two downward wells with sun dominant', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Sun and Earth');
+  const grid = buildFabricGrid(preset.bodies, {
+    size: 14,
+    resolution: 145,
+    strength: 0.22,
+    softening: 0.2,
+    heatmap: true,
+    time: 0,
+    wavesEnabled: false,
+    heatmapReferenceDepth: 0.9,
+  });
+  const sun = nearestFabricVertex(grid, Vec3.zero());
+  const earth = nearestFabricVertex(grid, new Vec3(3.2, 0, 0));
+  const innerShoulder = nearestFabricVertex(grid, new Vec3(2.7, 0, 0));
+  const outerShoulder = nearestFabricVertex(grid, new Vec3(3.7, 0, 0));
+
+  assert.ok(earth.displayDepth > innerShoulder.displayDepth * 1.4);
+  assert.ok(earth.displayDepth > outerShoulder.displayDepth * 1.4);
+  assert.ok(sun.displayDepth > earth.displayDepth * 2.8);
+  assert.ok(sun.color.r > earth.color.r);
+  assert.ok(earth.color.b > sun.color.b);
+});
+
+test('heatmap color ramp maps fixed height levels from cold top to warm bottom', () => {
+  const top = heatColorForDepth(0, 1.35);
+  const middle = heatColorForDepth(0.68, 1.35);
+  const bottom = heatColorForDepth(1.35, 1.35);
+
+  assert.ok(top.b > top.r + 120);
+  assert.ok(middle.g > middle.b);
+  assert.ok(bottom.r > bottom.b + 180);
+});
+
 test('visual gravitational ripple decays with distance', () => {
   const near = Math.abs(rippleHeight(1, 0, 4, 1));
   const far = Math.abs(rippleHeight(8, 0, 4, 1));
 
   assert.ok(near > far);
 });
+
+function nearestFabricVertex(grid, position) {
+  let nearest = null;
+  let nearestDistance = Infinity;
+  for (const vertex of grid.vertices) {
+    const dx = vertex.x - position.x;
+    const dz = vertex.z - position.z;
+    const distance = Math.sqrt(dx * dx + dz * dz);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearest = vertex;
+    }
+  }
+  return nearest;
+}

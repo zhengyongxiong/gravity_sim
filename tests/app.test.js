@@ -64,6 +64,40 @@ test('heatmap surface builds filled triangles instead of grid-only lines', () =>
   assert.ok(surface.colors.some((value) => value > 0 && value < 1));
 });
 
+test('high resolution fabric creates a dense readable heatmap mesh', () => {
+  const bodies = [
+    createBody({ name: 'Well', type: BodyType.STAR, mass: 1, position: Vec3.zero(), radius: 0.1 }),
+  ];
+  const surface = buildFabricSurface(bodies, {
+    fabricSize: 14,
+    fabricResolution: 145,
+    fabricStrength: 0.22,
+    fabricSoftening: 0.2,
+    showWaves: false,
+    heatmap: true,
+  }, 0);
+
+  assert.equal(surface.positions.length / 3, (145 - 1) * (145 - 1) * 6);
+});
+
+test('heatmap grid overlay uses subtle thin-line alpha', () => {
+  const bodies = [
+    createBody({ name: 'Well', type: BodyType.STAR, mass: 1, position: Vec3.zero(), radius: 0.1 }),
+  ];
+  const layers = buildFabricLayers(bodies, {
+    fabricSize: 14,
+    fabricResolution: 17,
+    fabricStrength: 0.22,
+    fabricSoftening: 0.2,
+    showWaves: false,
+    showFabric: true,
+    heatmap: true,
+  }, 0);
+  const alphas = layers.grid.colors.filter((_, index) => index % 4 === 3);
+
+  assert.ok(Math.max(...alphas) <= 0.24);
+});
+
 test('heatmap mode combines continuous color surface and grid on the same geometry', () => {
   const bodies = [
     createBody({ name: 'Well', type: BodyType.STAR, mass: 1, position: Vec3.zero(), radius: 0.1 }),
@@ -369,11 +403,11 @@ test('moon sprite keeps a readable minimum world size', () => {
   assert.ok(bodySpriteWorldSize(moon) >= 0.07);
 });
 
-test('heatmap colors separate satellites planets and stars by dominant mass tier', () => {
+test('heatmap colors follow absolute fabric depth instead of body type', () => {
   const grid = buildFabricGrid([
-    createBody({ name: 'Probe', type: BodyType.PARTICLE, mass: 0.0001, radius: 0.012, position: new Vec3(-1, 0, 0) }),
-    createBody({ name: 'Planet', type: BodyType.PLANET, mass: 1, radius: 0.05, position: Vec3.zero() }),
-    createBody({ name: 'Star', type: BodyType.STAR, mass: 1, radius: 0.1, position: new Vec3(1, 0, 0) }),
+    createBody({ name: 'Probe', type: BodyType.PARTICLE, mass: 0.0001, radius: 0.012, position: new Vec3(-1.25, 0, 0) }),
+    createBody({ name: 'Planet', type: BodyType.PLANET, mass: 1, visualMass: 0.08, radius: 0.05, position: Vec3.zero() }),
+    createBody({ name: 'Star', type: BodyType.STAR, mass: 1, radius: 0.1, position: new Vec3(1.25, 0, 0) }),
   ], {
     size: 4,
     resolution: 49,
@@ -384,14 +418,14 @@ test('heatmap colors separate satellites planets and stars by dominant mass tier
     heatmapReferenceDepth: 0.22 / 0.16,
   });
 
-  const probe = nearestFabricVertex(grid, new Vec3(-1, 0, 0));
+  const probe = nearestFabricVertex(grid, new Vec3(-1.25, 0, 0));
   const planet = nearestFabricVertex(grid, Vec3.zero());
-  const star = nearestFabricVertex(grid, new Vec3(1, 0, 0));
+  const star = nearestFabricVertex(grid, new Vec3(1.25, 0, 0));
 
-  assert.ok(probe.massTier < planet.massTier);
-  assert.ok(planet.massTier < star.massTier);
+  assert.ok(Math.abs(probe.y) < Math.abs(planet.y));
+  assert.ok(Math.abs(planet.y) < Math.abs(star.y));
   assert.ok(probe.color.b > probe.color.r + 120);
-  assert.ok(planet.color.g > planet.color.r + 60);
+  assert.ok(planet.color.g > planet.color.b);
   assert.ok(star.color.r > star.color.b + 180);
 });
 
