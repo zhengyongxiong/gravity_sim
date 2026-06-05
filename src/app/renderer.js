@@ -351,7 +351,7 @@ function heatmapAlphaForVertex(vertex, grid, settings) {
   const relativeDepth = Math.max(0, vertex.displayDepth ?? Math.abs(vertex.y)) / Math.max(grid.maxDisplayDepth ?? grid.maxDepth, 1e-9);
   const visibility = grid.maxVisualMass <= 0.01
     ? smoothstep(0.17, 0.46, relativeDepth)
-    : smoothstep(0.16, 0.55, relativeDepth);
+    : smoothstep(0.08, 0.46, vertex.sceneHeat ?? vertex.heat ?? relativeDepth);
   return baseAlpha * Math.max(0, Math.min(1, visibility));
 }
 

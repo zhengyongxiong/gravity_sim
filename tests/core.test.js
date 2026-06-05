@@ -10,7 +10,12 @@ import {
   normalizedToSi,
   siToNormalized,
 } from '../src/core/units.js';
-import { buildFabricGrid, heatColorForDepth, rippleHeight } from '../src/core/fabric.js';
+import {
+  buildFabricGrid,
+  heatColorForDepth,
+  rippleHeight,
+  visualGravityMass,
+} from '../src/core/fabric.js';
 import { createPresets } from '../src/core/presets.js';
 
 test('Vec3 supports immutable vector arithmetic', () => {
@@ -196,6 +201,17 @@ test('solar and lunar presets use readable science-inspired spacing', () => {
   assert.ok(earth.radius > moon.radius * 2.5);
 });
 
+test('sun earth keeps physical orbit mass while using readable visual field mass', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Sun and Earth');
+  const [sun, earth] = preset.bodies;
+  const physicalRatio = earth.mass / sun.mass;
+  const visualRatio = visualGravityMass(earth) / visualGravityMass(sun);
+
+  approx(physicalRatio, 3e-6, 1e-12);
+  assert.ok(visualRatio > 0.12);
+  assert.ok(visualRatio < 0.16);
+});
+
 test('fabric superposes wells and heatmap moves from cool to hot with depth', () => {
   const bodies = [
     createBody({ name: 'A', type: BodyType.STAR, mass: 1, position: new Vec3(-1, 0, 0), radius: 0.1 }),
@@ -263,9 +279,9 @@ test('strong-system fabric display follows additive potential without visibility
   approx(shoulder.displayDepth, shoulder.depth, 1e-12);
 });
 
-test('sun earth heatmap has two downward wells with sun dominant', () => {
+test('sun earth heatmap has a readable additive double well', () => {
   const preset = createPresets().find((candidate) => candidate.title === 'Sun and Earth');
-  const grid = buildFabricGrid(preset.bodies, {
+  const settings = {
     size: 14,
     resolution: 145,
     strength: 0.22,
@@ -274,17 +290,43 @@ test('sun earth heatmap has two downward wells with sun dominant', () => {
     time: 0,
     wavesEnabled: false,
     heatmapReferenceDepth: 0.9,
-  });
-  const sun = nearestFabricVertex(grid, Vec3.zero());
-  const earth = nearestFabricVertex(grid, new Vec3(3.2, 0, 0));
-  const innerShoulder = nearestFabricVertex(grid, new Vec3(2.7, 0, 0));
-  const outerShoulder = nearestFabricVertex(grid, new Vec3(3.7, 0, 0));
+  };
+  const combined = buildFabricGrid(preset.bodies, settings);
+  const sun = nearestFabricVertex(combined, Vec3.zero());
+  const earth = nearestFabricVertex(combined, new Vec3(3.2, 0, 0));
+  const innerShoulder = nearestFabricVertex(combined, new Vec3(2.7, 0, 0));
+  const outerShoulder = nearestFabricVertex(combined, new Vec3(3.7, 0, 0));
 
-  assert.ok(earth.displayDepth > innerShoulder.displayDepth * 1.4);
-  assert.ok(earth.displayDepth > outerShoulder.displayDepth * 1.4);
-  assert.ok(sun.displayDepth > earth.displayDepth * 2.8);
-  assert.ok(sun.color.r > earth.color.r);
-  assert.ok(earth.color.b > sun.color.b);
+  assert.ok(earth.displayDepth > innerShoulder.displayDepth * 2.4);
+  assert.ok(earth.displayDepth > outerShoulder.displayDepth * 3.4);
+  approx(earth.displayDepth, earth.depth, 1e-12);
+  assert.ok(sun.displayDepth > earth.displayDepth * 1.8);
+  assert.ok(sun.displayDepth < earth.displayDepth * 2.4);
+  assert.ok(earth.color.g > earth.color.b);
+});
+
+test('planetary visual waves animate geometry without changing heat depth', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Earth and Moon');
+  const settings = {
+    size: 9,
+    resolution: 55,
+    strength: 0.22,
+    softening: 0.16,
+    heatmap: true,
+    wavesEnabled: true,
+    heatmapReferenceDepth: 0.22 / 0.16,
+  };
+  const staticGrid = buildFabricGrid(preset.bodies, { ...settings, wavesEnabled: false, time: 0 });
+  const early = buildFabricGrid(preset.bodies, { ...settings, time: 0 });
+  const later = buildFabricGrid(preset.bodies, { ...settings, time: 0.23 });
+  const staticSample = nearestFabricVertex(staticGrid, new Vec3(0.4, 0, 0.2));
+  const sampleA = nearestFabricVertex(early, new Vec3(0.4, 0, 0.2));
+  const sampleB = nearestFabricVertex(later, new Vec3(0.4, 0, 0.2));
+
+  approx(sampleA.depth, staticSample.depth, 1e-12);
+  approx(sampleB.depth, staticSample.depth, 1e-12);
+  assert.ok(Math.abs(sampleA.displayDepth - sampleB.displayDepth) > 0.04);
+  assert.ok(colorDistance(sampleA.color, sampleB.color) > 20);
 });
 
 test('heatmap color ramp maps fixed height levels from cold top to warm bottom', () => {
@@ -317,4 +359,12 @@ function nearestFabricVertex(grid, position) {
     }
   }
   return nearest;
+}
+
+function colorDistance(a, b) {
+  return Math.sqrt(
+    (a.r - b.r) ** 2
+    + (a.g - b.g) ** 2
+    + (a.b - b.b) ** 2,
+  );
 }

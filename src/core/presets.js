@@ -16,7 +16,7 @@ export function createPresets() {
       classification: 'near circular two-body ellipse',
       bodies: [
         createBody({ name: 'Sun', type: BodyType.STAR, mass: 1, visualMass: 1, radius: 0.16, density: 1.4, position: Vec3.zero(), velocity: Vec3.zero(), color: [255, 236, 180] }),
-        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 3e-6, visualMass: 0.06, radius: 0.035, density: 5.5, position: new Vec3(3.2, 0, 0), velocity: new Vec3(0, 0, 0.56), color: [80, 140, 255] }),
+        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 3e-6, visualMass: 0.14, radius: 0.035, density: 5.5, position: new Vec3(3.2, 0, 0), velocity: new Vec3(0, 0, 0.56), color: [80, 140, 255] }),
       ],
     },
     {

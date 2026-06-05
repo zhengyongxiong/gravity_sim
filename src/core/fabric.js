@@ -51,6 +51,7 @@ export function buildFabricGrid(bodies, settings) {
         linearHeat: clamp(depth / Math.max(maxDepth, 1e-9), 0, 1),
         massTier: field.massTier,
         localVisibility: field.localVisibility,
+        wave: field.wave,
         color: { r: 115, g: 122, b: 130 },
       });
     }
@@ -61,10 +62,14 @@ export function buildFabricGrid(bodies, settings) {
     vertex.sceneHeat = clamp((vertex.heat - minHeat) / heatRange, 0, 1);
     const bridgeVisibility = smoothstep(0.04, 0.34, vertex.sceneHeat) * (maxVisualMass > 0.01 ? 0.38 : 0.34);
     vertex.fieldVisibility = clamp(Math.max(vertex.localVisibility, bridgeVisibility), 0, 1);
-    vertex.displayDepth = visualDisplayDepth(vertex, maxVisualMass, maxRawDepth);
+    vertex.baseDisplayDepth = visualDisplayDepth(vertex, maxVisualMass, maxRawDepth);
+    vertex.displayDepth = Math.max(0, vertex.baseDisplayDepth + visualWaveOffset(vertex.wave, maxVisualMass));
     maxDisplayDepth = Math.max(maxDisplayDepth, vertex.displayDepth);
     vertex.y = -vertex.displayDepth;
-    if (heatmap) vertex.color = heatColorForDepth(heatmapColorDepth(vertex, maxVisualMass), maxDepth);
+    if (heatmap) {
+      const color = heatColorForDepth(heatmapColorDepth(vertex, maxVisualMass), maxDepth);
+      vertex.color = wavesEnabled ? waveTintColor(color, vertex.wave, maxVisualMass) : color;
+    }
   }
 
   return { vertices, resolution, size, maxDepth, maxVisualMass, maxRawDepth, maxDisplayDepth, minHeat, maxHeat };
@@ -84,6 +89,7 @@ export function fabricDepthAt(x, z, bodies, settings = {}) {
 
 function sampleFabricField(x, z, bodyFields, settings) {
   let depth = 0;
+  let wave = 0;
   let dominantVisibility = -1;
   let massTier = 0;
   let localVisibility = 0;
@@ -103,12 +109,25 @@ function sampleFabricField(x, z, bodyFields, settings) {
       massTier = field.massTier;
     }
 
-    if (settings.wavesEnabled && body.glow) {
-      depth += rippleHeight(distance, settings.time ?? 0, body.mass, settings.strength);
+    if (settings.wavesEnabled && visualRippleEnabled(body)) {
+      wave += rippleHeight(distance, settings.time ?? 0, visualRippleMass(body), settings.strength);
     }
   }
 
-  return { depth, massTier, localVisibility };
+  return { depth, wave, massTier, localVisibility };
+}
+
+function visualRippleEnabled(body) {
+  return body.glow
+    || body.type === BodyType.STAR
+    || body.type === BodyType.PLANET
+    || body.type === BodyType.NEUTRON_STAR
+    || body.type === BodyType.WHITE_DWARF;
+}
+
+function visualRippleMass(body) {
+  if (body.type === BodyType.PLANET) return Math.max(body.mass, visualGravityMass(body));
+  return body.mass;
 }
 
 export function visualGravityMass(body) {
@@ -170,9 +189,30 @@ function visualDisplayDepth(vertex, maxVisualMass, maxRawDepth) {
 }
 
 function heatmapColorDepth(vertex, maxVisualMass) {
+  const displayDepth = Math.max(0, vertex.baseDisplayDepth ?? vertex.displayDepth ?? 0);
   return maxVisualMass <= 0.01
-    ? Math.max(0, vertex.displayDepth ?? 0) * 0.55
-    : Math.max(0, vertex.displayDepth ?? 0);
+    ? displayDepth * 0.55
+    : displayDepth;
+}
+
+function visualWaveOffset(wave, maxVisualMass) {
+  const scale = maxVisualMass <= 0.01 ? 2.0 : 0.65;
+  return (Number.isFinite(wave) ? wave : 0) * scale;
+}
+
+function waveTintColor(color, wave, maxVisualMass) {
+  const weakSystem = maxVisualMass <= 0.01;
+  const reference = weakSystem ? 0.02 : 0.03;
+  const amount = clamp(Math.abs(wave ?? 0) / reference, 0, 1) * (weakSystem ? 0.45 : 0.24);
+  if (amount <= 0) return color;
+  const target = wave >= 0
+    ? { r: 70, g: 255, b: 230 }
+    : { r: 8, g: 48, b: 255 };
+  return {
+    r: Math.round(color.r + (target.r - color.r) * amount),
+    g: Math.round(color.g + (target.g - color.g) * amount),
+    b: Math.round(color.b + (target.b - color.b) * amount),
+  };
 }
 
 export function heatmapIntensity(depth, maxDepth, exposure = 1) {

@@ -70,14 +70,14 @@ test('high resolution fabric creates a dense readable heatmap mesh', () => {
   ];
   const surface = buildFabricSurface(bodies, {
     fabricSize: 14,
-    fabricResolution: 145,
+    fabricResolution: 181,
     fabricStrength: 0.22,
     fabricSoftening: 0.2,
     showWaves: false,
     heatmap: true,
   }, 0);
 
-  assert.equal(surface.positions.length / 3, (145 - 1) * (145 - 1) * 6);
+  assert.equal(surface.positions.length / 3, (181 - 1) * (181 - 1) * 6);
 });
 
 test('heatmap grid overlay uses subtle thin-line alpha', () => {
@@ -138,6 +138,23 @@ test('hidden heatmap base makes cool regions transparent while keeping wells vis
 
   assert.ok(Math.min(...alphas) < 0.08);
   assert.ok(Math.max(...alphas) > 0.5);
+});
+
+test('sun earth hidden-base heatmap keeps the additive field bridge visible', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Sun and Earth');
+  const surface = buildFabricSurface(preset.bodies, {
+    fabricSize: 14,
+    fabricResolution: 145,
+    fabricStrength: 0.22,
+    fabricSoftening: 0.2,
+    heatmap: true,
+    showWaves: false,
+    hideHeatmapBase: true,
+    heatmapReferenceDepth: 0.9,
+  }, 0);
+
+  assert.ok(maxAlphaNear(surface, new Vec3(1.6, 0, 0), 0.16) > 0.2);
+  assert.ok(maxAlphaNear(surface, new Vec3(6.5, 0, 6.5), 0.16) < 0.15);
 });
 
 test('default camera starts in a low side-view angle', () => {
