@@ -29,6 +29,7 @@ export function siToNormalized(body) {
     radius: body.radius / UnitScale.distance,
     position: convertVec3(body.position, UnitScale.distance),
     velocity: convertVec3(body.velocity, UnitScale.velocity),
+    spinRate: Number.isFinite(body.spinRate) ? body.spinRate * UnitScale.time : body.spinRate,
     unitSystem: UnitSystem.NORMALIZED,
   };
 }
@@ -42,6 +43,7 @@ export function normalizedToSi(body) {
     radius: body.radius * UnitScale.distance,
     position: restoreVec3(body.position, UnitScale.distance),
     velocity: restoreVec3(body.velocity, UnitScale.velocity),
+    spinRate: Number.isFinite(body.spinRate) ? body.spinRate / UnitScale.time : body.spinRate,
     unitSystem: UnitSystem.SI,
   };
 }

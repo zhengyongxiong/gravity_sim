@@ -1,22 +1,26 @@
 import { Vec3 } from './math.js';
 import { BodyType, createBody } from './simulation.js';
 
+const SolarSpinAxis = tiltedAxis(7.25);
+const EarthSpinAxis = tiltedAxis(23.44);
+const MoonSpinAxis = tiltedAxis(1.54);
+
 export function createPresets() {
   return [
     {
       title: 'Earth and Moon',
       classification: 'stable planet-moon orbit',
       bodies: [
-        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 1, visualMass: 3e-6, radius: 0.06, density: 5, position: Vec3.zero(), velocity: new Vec3(0, -0.004, 0), color: [80, 140, 255] }),
-        createBody({ name: 'Moon', type: BodyType.PARTICLE, mass: 0.0123, visualMass: 3.7e-8, radius: 0.018, density: 3.3, position: new Vec3(2.25, 0, 0), velocity: new Vec3(0, 0, 0.67), color: [210, 210, 210] }),
+        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 1, visualMass: 3e-6, radius: 0.06, density: 5, position: Vec3.zero(), velocity: new Vec3(0, -0.004, 0), spinRate: 8.1, spinAxis: EarthSpinAxis, color: [80, 140, 255] }),
+        createBody({ name: 'Moon', type: BodyType.PARTICLE, mass: 0.0123, visualMass: 3.7e-8, radius: 0.018, density: 3.3, position: new Vec3(2.25, 0, 0), velocity: new Vec3(0, 0, 0.67), spinRate: 0.67 / 2.25, spinAxis: MoonSpinAxis, tidallyLockedTo: 'Earth', color: [210, 210, 210] }),
       ],
     },
     {
       title: 'Sun and Earth',
       classification: 'near circular two-body ellipse',
       bodies: [
-        createBody({ name: 'Sun', type: BodyType.STAR, mass: 1, visualMass: 1, radius: 0.16, density: 1.4, position: Vec3.zero(), velocity: Vec3.zero(), color: [255, 236, 180] }),
-        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 3e-6, visualMass: 0.14, radius: 0.035, density: 5.5, position: new Vec3(3.2, 0, 0), velocity: new Vec3(0, 0, 0.56), color: [80, 140, 255] }),
+        createBody({ name: 'Sun', type: BodyType.STAR, mass: 1, visualMass: 1, radius: 0.16, density: 1.4, position: Vec3.zero(), velocity: new Vec3(0, 0, -3e-6 * 0.56), spinRate: (0.56 / 3.2) * (365.256 / 25.38), spinAxis: SolarSpinAxis, color: [255, 236, 180] }),
+        createBody({ name: 'Earth', type: BodyType.PLANET, mass: 3e-6, visualMass: 0.022, radius: 0.014, density: 5.5, position: new Vec3(3.2, 0, 0), velocity: new Vec3(0, 0, 0.56), spinRate: (0.56 / 3.2) * 365.256, spinAxis: EarthSpinAxis, color: [80, 140, 255] }),
       ],
     },
     {
@@ -121,4 +125,9 @@ function rotatingTriangle(radius, mass) {
       color: [[255, 120, 120], [120, 180, 255], [180, 255, 150]][index],
     });
   });
+}
+
+function tiltedAxis(degrees) {
+  const radians = degrees * Math.PI / 180;
+  return new Vec3(Math.sin(radians), Math.cos(radians), 0).normalized();
 }

@@ -67,6 +67,10 @@ export function createBody(options = {}) {
     acceleration: Vec3.from(options.acceleration),
     color: options.color ?? defaults.color,
     glow: options.glow ?? defaults.glow,
+    spinRate: options.spinRate ?? 0,
+    spinPhase: options.spinPhase ?? 0,
+    spinAxis: Vec3.from(options.spinAxis ?? new Vec3(0, 1, 0)).normalized(),
+    tidallyLockedTo: options.tidallyLockedTo,
     trail: options.trail ? options.trail.map(Vec3.from) : [],
     selected: options.selected ?? false,
     unitSystem: options.unitSystem ?? UnitSystem.NORMALIZED,
@@ -188,6 +192,10 @@ export function mergeBodies(a, b) {
     : BodyTypeDefaults[primary].density;
   const momentum = a.velocity.scale(a.mass).add(b.velocity.scale(b.mass));
   const position = a.position.scale(a.mass).add(b.position.scale(b.mass)).scale(1 / mass);
+  const spinAxis = a.spinAxis
+    .scale(Math.abs(a.spinRate) * a.mass)
+    .add(b.spinAxis.scale(Math.abs(b.spinRate) * b.mass))
+    .normalized();
   const trail = [...a.trail, ...b.trail].slice(-Math.max(a.trail.length, b.trail.length, 1));
 
   return createBody({
@@ -198,6 +206,9 @@ export function mergeBodies(a, b) {
     radius: radiusFromMassDensity(mass, density),
     position,
     velocity: momentum.scale(1 / mass),
+    spinRate: (a.spinRate * a.mass + b.spinRate * b.mass) / mass,
+    spinPhase: primary === a.type ? a.spinPhase : b.spinPhase,
+    spinAxis: spinAxis.length() > 0 ? spinAxis : (primary === a.type ? a.spinAxis : b.spinAxis),
     trail,
   });
 }

@@ -40,17 +40,23 @@ attribute vec2 a_uv;
 attribute vec4 a_color;
 attribute float a_style;
 attribute float a_seed;
+attribute float a_spin;
+attribute vec2 a_spin_axis;
 uniform mat4 u_matrix;
 varying vec2 v_uv;
 varying vec4 v_color;
 varying float v_style;
 varying float v_seed;
+varying float v_spin;
+varying vec2 v_spin_axis;
 void main() {
   gl_Position = u_matrix * vec4(a_position, 1.0);
   v_uv = a_uv;
   v_color = a_color;
   v_style = a_style;
   v_seed = a_seed;
+  v_spin = a_spin;
+  v_spin_axis = a_spin_axis;
 }`;
 
 const fragmentShader = `
@@ -109,6 +115,8 @@ varying vec2 v_uv;
 varying vec4 v_color;
 varying float v_style;
 varying float v_seed;
+varying float v_spin;
+varying vec2 v_spin_axis;
 void main() {
   vec2 p = v_uv;
   float d = dot(p, p);
@@ -117,10 +125,15 @@ void main() {
   float edge = smoothstep(1.0, 0.86, radius);
   vec3 color = v_color.rgb;
   float alpha = v_color.a * edge;
+  float spinCos = cos(v_spin);
+  float spinSin = sin(v_spin);
+  vec2 spun = vec2(p.x * spinCos - p.y * spinSin, p.x * spinSin + p.y * spinCos);
+  vec2 pole = normalize(v_spin_axis);
+  vec2 equator = vec2(pole.y, -pole.x);
 
   if (v_style > 0.5 && v_style < 1.5) {
     float core = smoothstep(0.92, 0.0, radius);
-    float flame = 0.5 + 0.5 * sin((p.x + v_seed) * 18.0) * sin((p.y - v_seed) * 24.0);
+    float flame = 0.5 + 0.5 * sin((spun.x + v_seed) * 18.0) * sin((spun.y - v_seed) * 24.0);
     vec3 ember = vec3(0.9, 0.12, 0.01);
     vec3 orange = vec3(1.0, 0.44, 0.03);
     vec3 whiteHot = vec3(1.0, 0.94, 0.55);
@@ -129,8 +142,9 @@ void main() {
     alpha = v_color.a * smoothstep(1.0, 0.02, radius);
   } else if (v_style > 1.5 && v_style < 2.5) {
     float sphere = sqrt(max(0.0, 1.0 - d));
-    float land = sin(p.x * 7.0 + v_seed * 5.0) + sin(p.y * 10.0 - v_seed * 2.0) + sin((p.x - p.y) * 8.0);
-    float cloud = smoothstep(1.35, 1.9, sin(p.x * 17.0 + p.y * 5.0 + v_seed * 9.0));
+    vec2 planet = vec2(dot(p, equator) + v_spin * 0.08, dot(p, pole));
+    float land = sin(planet.x * 7.0 + v_seed * 5.0) + sin(planet.y * 10.0 - v_seed * 2.0) + sin((planet.x - planet.y) * 8.0);
+    float cloud = smoothstep(1.35, 1.9, sin(planet.x * 17.0 + planet.y * 5.0 + v_seed * 9.0));
     vec3 ocean = vec3(0.01, 0.18, 0.76);
     vec3 continent = vec3(0.08, 0.48, 0.18);
     color = mix(ocean, continent, smoothstep(0.15, 0.7, land));
@@ -138,8 +152,17 @@ void main() {
     color *= 0.52 + sphere * 0.62;
     alpha = v_color.a * edge;
   } else if (v_style > 2.5 && v_style < 3.5) {
-    float band = 0.5 + 0.5 * sin(p.y * 14.0 + v_seed * 6.0);
+    float band = 0.5 + 0.5 * sin(spun.y * 14.0 + v_seed * 6.0);
     color = mix(v_color.rgb * 0.58, v_color.rgb * 1.25, band);
+    alpha = v_color.a * edge;
+  } else if (v_style > 3.5 && v_style < 4.5) {
+    float sphere = sqrt(max(0.0, 1.0 - d));
+    vec2 locked = vec2(dot(p, equator) + v_spin * 0.04, dot(p, pole));
+    float maria = sin(locked.x * 9.0 + v_seed * 5.0) + sin(locked.y * 12.0 - v_seed * 3.0);
+    float crater = smoothstep(0.25, 0.95, abs(sin(locked.x * 21.0) * sin(locked.y * 17.0)));
+    color = mix(vec3(0.44), vec3(0.78), 0.45 + 0.25 * sphere);
+    color = mix(color, vec3(0.25), smoothstep(0.1, 1.0, maria) * 0.35);
+    color = mix(color, vec3(0.88), crater * 0.16);
     alpha = v_color.a * edge;
   }
 
@@ -160,6 +183,8 @@ export class Renderer {
     this.sizeBuffer = this.gl.createBuffer();
     this.styleBuffer = this.gl.createBuffer();
     this.seedBuffer = this.gl.createBuffer();
+    this.spinBuffer = this.gl.createBuffer();
+    this.spinAxisBuffer = this.gl.createBuffer();
   }
 
   resize() {
@@ -197,7 +222,7 @@ export class Renderer {
     }
     if (settings.showTrails) this.drawLines(buildTrailLines(state.bodies), matrix, 1);
     this.drawPoints(buildGlowPoints(state.bodies), matrix);
-    this.drawSprites(buildBodySprites(state.bodies, camera), matrix);
+    this.drawSprites(buildBodySprites(state.bodies, camera, state.time), matrix);
     this.drawPoints(buildFlashPoints(state.flashes), matrix);
   }
 
@@ -250,6 +275,16 @@ export class Renderer {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(batch.seeds), gl.DYNAMIC_DRAW);
     gl.enableVertexAttribArray(program.seed);
     gl.vertexAttribPointer(program.seed, 1, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.spinBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(batch.spins), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(program.spin);
+    gl.vertexAttribPointer(program.spin, 1, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.spinAxisBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(batch.spinAxes), gl.DYNAMIC_DRAW);
+    gl.enableVertexAttribArray(program.spinAxis);
+    gl.vertexAttribPointer(program.spinAxis, 2, gl.FLOAT, false, 0, 0);
 
     gl.drawArrays(gl.TRIANGLES, 0, batch.positions.length / 3);
     gl.enable(gl.DEPTH_TEST);
@@ -470,16 +505,20 @@ function createProgram(gl, vsSource, fsSource) {
     size: gl.getAttribLocation(program, 'a_size'),
     style: gl.getAttribLocation(program, 'a_style'),
     seed: gl.getAttribLocation(program, 'a_seed'),
+    spin: gl.getAttribLocation(program, 'a_spin'),
+    spinAxis: gl.getAttribLocation(program, 'a_spin_axis'),
     matrix: gl.getUniformLocation(program, 'u_matrix'),
   };
 }
 
-export function buildBodySprites(bodies, camera) {
+export function buildBodySprites(bodies, camera, time = 0) {
   const positions = [];
   const uvs = [];
   const colors = [];
   const styles = [];
   const seeds = [];
+  const spins = [];
+  const spinAxes = [];
   const forward = cameraForward(camera);
   const right = cameraRight(camera);
   const up = cross(right, forward).normalized();
@@ -487,6 +526,8 @@ export function buildBodySprites(bodies, camera) {
   for (const body of bodies) {
     const style = bodyStyle(body);
     const halfSize = bodySpriteWorldSize(body, style);
+    const spin = bodySpinPhase(body, time);
+    const spinAxis = bodySpriteSpinAxis(body, right, up);
     const center = body.position;
     const left = right.scale(-halfSize);
     const rightOffset = right.scale(halfSize);
@@ -506,11 +547,13 @@ export function buildBodySprites(bodies, camera) {
       pushColor(colors, body.selected ? [255, 255, 255] : body.color, 1);
       styles.push(style);
       seeds.push((body.id % 997) / 997);
+      spins.push(spin);
+      spinAxes.push(spinAxis.x, spinAxis.y);
     }
     uvs.push(...spriteUvs);
   }
 
-  return { positions, uvs, colors, styles, seeds };
+  return { positions, uvs, colors, styles, seeds, spins, spinAxes };
 }
 
 function compileShader(gl, type, source) {
@@ -584,6 +627,7 @@ function bodyStyle(body) {
   if (body.glow) return 1;
   if (body.type === 'planet' && (body.name.toLowerCase().includes('earth') || isBluePlanet(body.color))) return 2;
   if (body.type === 'planet') return 3;
+  if (body.type === 'particle' && body.name.toLowerCase().includes('moon')) return 4;
   return 0;
 }
 
@@ -595,10 +639,25 @@ function bodyPointSize(body, style) {
 }
 
 export function bodySpriteWorldSize(body, style = bodyStyle(body)) {
-  if (style === 1) return Math.max(0.52, body.radius * 4.4);
-  if (style === 2) return Math.max(0.12, body.radius * 2.6);
-  if (style === 3) return Math.max(0.09, body.radius * 2.2);
-  return Math.max(0.07, body.radius * 1.7);
+  if (style === 1) return Math.max(0.54, body.radius * 4.2);
+  if (style === 2) return Math.max(0.052, body.radius * 3);
+  if (style === 3) return Math.max(0.045, body.radius * 2.2);
+  if (style === 4) return Math.max(0.038, body.radius * 1.8);
+  return Math.max(0.032, body.radius * 1.6);
+}
+
+function bodySpinPhase(body, time) {
+  const phase = Number.isFinite(body.spinPhase) ? body.spinPhase : 0;
+  const rate = Number.isFinite(body.spinRate) ? body.spinRate : 0;
+  return phase + rate * time;
+}
+
+function bodySpriteSpinAxis(body, right, up) {
+  const axis = Vec3.from(body.spinAxis ?? new Vec3(0, 1, 0)).normalized();
+  const projected = { x: axis.dot(right), y: axis.dot(up) };
+  const length = Math.sqrt(projected.x * projected.x + projected.y * projected.y);
+  if (length < 1e-6) return { x: 0, y: 1 };
+  return { x: projected.x / length, y: projected.y / length };
 }
 
 function isBluePlanet(color) {

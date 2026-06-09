@@ -12,6 +12,7 @@ import {
 } from '../src/core/units.js';
 import {
   buildFabricGrid,
+  generatedBodyVisualMass,
   heatColorForDepth,
   rippleHeight,
   visualGravityMass,
@@ -38,6 +39,7 @@ test('SI and normalized unit conversion round-trips body values', () => {
     radius: 6.371e6,
     position: new Vec3(1.496e11, 0, 0),
     velocity: new Vec3(0, 29780, 0),
+    spinRate: 7.2921159e-5,
     unitSystem: UnitSystem.SI,
   });
 
@@ -48,6 +50,7 @@ test('SI and normalized unit conversion round-trips body values', () => {
   approx(restored.radius, body.radius, 1e-2);
   vecApprox(restored.position, body.position, 1);
   vecApprox(restored.velocity, body.velocity, 1e-6);
+  approx(restored.spinRate, body.spinRate, 1e-12);
 });
 
 test('visual mass is explicit so rendering can use physical type scales', () => {
@@ -199,6 +202,13 @@ test('solar and lunar presets use readable science-inspired spacing', () => {
   assert.ok(sun.position.sub(solarEarth.position).length() > sun.radius * 18);
   assert.ok(sun.radius > solarEarth.radius * 3);
   assert.ok(earth.radius > moon.radius * 2.5);
+  assert.ok(earth.spinRate > moon.spinRate * 20);
+  assert.equal(moon.tidallyLockedTo, 'Earth');
+  assert.ok(sun.spinRate > 0);
+  assert.ok(solarEarth.spinRate > sun.spinRate * 20);
+  approx(sun.spinAxis.y, Math.cos(7.25 * Math.PI / 180), 1e-12);
+  approx(solarEarth.spinAxis.y, Math.cos(23.44 * Math.PI / 180), 1e-12);
+  assert.ok(sun.spinAxis.dot(solarEarth.spinAxis) > 0.9);
 });
 
 test('sun earth keeps physical orbit mass while using readable visual field mass', () => {
@@ -208,8 +218,16 @@ test('sun earth keeps physical orbit mass while using readable visual field mass
   const visualRatio = visualGravityMass(earth) / visualGravityMass(sun);
 
   approx(physicalRatio, 3e-6, 1e-12);
-  assert.ok(visualRatio > 0.12);
-  assert.ok(visualRatio < 0.16);
+  assert.ok(visualRatio > 0.018);
+  assert.ok(visualRatio < 0.03);
+});
+
+test('sun earth preset keeps total linear momentum near the barycentric frame', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Sun and Earth');
+  const [sun, earth] = preset.bodies;
+  const totalMomentum = sun.velocity.scale(sun.mass).add(earth.velocity.scale(earth.mass));
+
+  vecApprox(totalMomentum, Vec3.zero(), 1e-12);
 });
 
 test('fabric superposes wells and heatmap moves from cool to hot with depth', () => {
@@ -300,12 +318,43 @@ test('sun earth heatmap has a readable additive double well', () => {
   assert.ok(earth.displayDepth > innerShoulder.displayDepth * 2.4);
   assert.ok(earth.displayDepth > outerShoulder.displayDepth * 3.4);
   approx(earth.displayDepth, earth.depth, 1e-12);
-  assert.ok(sun.displayDepth > earth.displayDepth * 1.8);
-  assert.ok(sun.displayDepth < earth.displayDepth * 2.4);
+  assert.ok(sun.displayDepth > earth.displayDepth * 3.8);
+  assert.ok(sun.displayDepth < earth.displayDepth * 5.2);
   assert.ok(earth.color.g > earth.color.b);
 });
 
-test('planetary visual waves animate geometry without changing heat depth', () => {
+test('stationary visual masses keep a fabric dip without emitting waves', () => {
+  const body = createBody({
+    name: 'Static Sun',
+    type: BodyType.STAR,
+    mass: 1,
+    radius: 0.12,
+    position: Vec3.zero(),
+    velocity: Vec3.zero(),
+    spinRate: 2.5,
+  });
+  const settings = {
+    size: 4,
+    resolution: 17,
+    strength: 0.22,
+    softening: 0.16,
+    heatmap: true,
+    wavesEnabled: true,
+    heatmapReferenceDepth: 0.22 / 0.16,
+  };
+  const early = buildFabricGrid([body], { ...settings, time: 0 });
+  const later = buildFabricGrid([body], { ...settings, time: 0.4 });
+  const sampleA = nearestFabricVertex(early, new Vec3(0.5, 0, 0));
+  const sampleB = nearestFabricVertex(later, new Vec3(0.5, 0, 0));
+
+  assert.ok(sampleA.depth > 0);
+  approx(sampleA.wave, 0, 1e-12);
+  approx(sampleB.wave, 0, 1e-12);
+  approx(sampleA.displayDepth, sampleB.displayDepth, 1e-12);
+  assert.deepEqual(sampleA.color, sampleB.color);
+});
+
+test('earth moon system keeps visual gravity waves effectively invisible', () => {
   const preset = createPresets().find((candidate) => candidate.title === 'Earth and Moon');
   const settings = {
     size: 9,
@@ -325,8 +374,69 @@ test('planetary visual waves animate geometry without changing heat depth', () =
 
   approx(sampleA.depth, staticSample.depth, 1e-12);
   approx(sampleB.depth, staticSample.depth, 1e-12);
+  approx(sampleA.wave, 0, 1e-12);
+  approx(sampleB.wave, 0, 1e-12);
+  approx(sampleA.displayDepth, staticSample.displayDepth, 1e-12);
+  approx(sampleB.displayDepth, staticSample.displayDepth, 1e-12);
+  assert.deepEqual(sampleA.color, staticSample.color);
+  assert.deepEqual(sampleB.color, staticSample.color);
+});
+
+test('compact stellar systems can still show visual waves without changing heat depth', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Binary Stars');
+  const settings = {
+    size: 5,
+    resolution: 55,
+    strength: 0.22,
+    softening: 0.16,
+    heatmap: true,
+    wavesEnabled: true,
+    heatmapReferenceDepth: 0.9,
+  };
+  const staticGrid = buildFabricGrid(preset.bodies, { ...settings, wavesEnabled: false, time: 0 });
+  const early = buildFabricGrid(preset.bodies, { ...settings, time: 0 });
+  const later = buildFabricGrid(preset.bodies, { ...settings, time: 0.23 });
+  const staticSample = nearestFabricVertex(staticGrid, new Vec3(0, 0, 0.4));
+  const sampleA = nearestFabricVertex(early, new Vec3(0, 0, 0.4));
+  const sampleB = nearestFabricVertex(later, new Vec3(0, 0, 0.4));
+
+  approx(sampleA.depth, staticSample.depth, 1e-12);
+  approx(sampleB.depth, staticSample.depth, 1e-12);
   assert.ok(Math.abs(sampleA.displayDepth - sampleB.displayDepth) > 0.04);
   assert.ok(colorDistance(sampleA.color, sampleB.color) > 20);
+});
+
+test('generated bodies receive a visible spacetime dip floor', () => {
+  const defaultParticle = createBody({
+    name: 'Default particle',
+    type: BodyType.PARTICLE,
+    mass: 0.0001,
+    radius: 0.012,
+    position: new Vec3(1.2, 0, 0),
+    velocity: Vec3.zero(),
+  });
+  const generatedParticle = createBody({
+    ...defaultParticle,
+    name: 'Generated particle',
+    visualMass: generatedBodyVisualMass(defaultParticle.type, defaultParticle.mass),
+  });
+  const grid = buildFabricGrid([
+    createBody({ name: 'Star', type: BodyType.STAR, mass: 1, radius: 0.12, position: Vec3.zero() }),
+    generatedParticle,
+  ], {
+    size: 4,
+    resolution: 49,
+    strength: 0.22,
+    softening: 0.16,
+    heatmap: true,
+    wavesEnabled: false,
+    heatmapReferenceDepth: 0.22 / 0.16,
+  });
+  const localWell = nearestFabricVertex(grid, generatedParticle.position);
+  const shoulder = nearestFabricVertex(grid, new Vec3(1.45, 0, 0));
+
+  assert.ok(visualGravityMass(generatedParticle) > visualGravityMass(defaultParticle) * 1000);
+  assert.ok(localWell.displayDepth > shoulder.displayDepth + 0.04);
 });
 
 test('heatmap color ramp maps fixed height levels from cold top to warm bottom', () => {

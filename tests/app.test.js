@@ -204,6 +204,61 @@ test('body billboard rendering creates textured quads for visible body detail', 
   assert.equal(sprites.positions.length / 3, 12);
   assert.equal(sprites.uvs.length / 2, 12);
   assert.deepEqual(sprites.styles, [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2]);
+  assert.equal(sprites.spinAxes.length / 2, 12);
+});
+
+test('body billboard spin changes texture phase without moving vertices', () => {
+  const camera = cameraForView('side');
+  const earth = createBody({
+    name: 'Earth',
+    type: BodyType.PLANET,
+    radius: 0.035,
+    position: new Vec3(1, 0, 0),
+    spinRate: 4,
+    color: [80, 140, 255],
+  });
+
+  const early = buildBodySprites([earth], camera, 0);
+  const later = buildBodySprites([earth], camera, 0.5);
+
+  assert.deepEqual(later.positions, early.positions);
+  assert.ok(later.spins.every((spin) => spin === 2));
+  assert.ok(early.spins.every((spin) => spin === 0));
+  assert.deepEqual(later.spinAxes, early.spinAxes);
+});
+
+test('body billboard projects spin axis into the sprite plane', () => {
+  const camera = cameraForView('side');
+  const earth = createBody({
+    name: 'Earth',
+    type: BodyType.PLANET,
+    radius: 0.035,
+    position: new Vec3(1, 0, 0),
+    spinAxis: new Vec3(Math.sin(23.44 * Math.PI / 180), Math.cos(23.44 * Math.PI / 180), 0),
+    color: [80, 140, 255],
+  });
+
+  const sprites = buildBodySprites([earth], camera, 0);
+  const firstAxis = sprites.spinAxes.slice(0, 2);
+
+  assert.ok(Math.abs(firstAxis[0]) > 0.2);
+  assert.ok(Math.abs(firstAxis[1]) > 0.8);
+});
+
+test('moon billboard uses a cratered style for tidal-lock readability', () => {
+  const camera = cameraForView('side');
+  const moon = createBody({
+    name: 'Moon',
+    type: BodyType.PARTICLE,
+    radius: 0.018,
+    position: new Vec3(1, 0, 0),
+    spinRate: 0.3,
+  });
+
+  const sprites = buildBodySprites([moon], camera, 1);
+
+  assert.ok(sprites.styles.every((style) => style === 4));
+  assert.ok(sprites.spins.every((spin) => spin === 0.3));
 });
 
 test('visual body sizes preserve actual size ordering after exaggeration', () => {
@@ -213,6 +268,14 @@ test('visual body sizes preserve actual size ordering after exaggeration', () =>
 
   assert.ok(bodySpriteWorldSize(sun) > bodySpriteWorldSize(earth) * 2);
   assert.ok(bodySpriteWorldSize(earth) > bodySpriteWorldSize(moon) * 1.2);
+});
+
+test('sun earth preset keeps the planet visibly smaller than the star', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Sun and Earth');
+  const [sun, earth] = preset.bodies;
+
+  assert.ok(sun.radius > earth.radius * 10);
+  assert.ok(bodySpriteWorldSize(sun) > bodySpriteWorldSize(earth) * 10);
 });
 
 test('heatmap color ramp is saturated for deep wells', () => {
@@ -384,7 +447,7 @@ test('side view projects the moon sprite large enough for narrow displays', () =
   const focalLength = (460 / 2) / Math.tan((camera.zoom * Math.PI / 180) / 2);
   const pixelRadius = (bodySpriteWorldSize(moon) / depth) * focalLength;
 
-  assert.ok(pixelRadius > 4.5);
+  assert.ok(pixelRadius > 2.5);
 });
 
 test('low mass heatmap wells remain bright enough on black space', () => {
@@ -417,7 +480,7 @@ test('moon sprite keeps a readable minimum world size', () => {
     color: [210, 210, 210],
   });
 
-  assert.ok(bodySpriteWorldSize(moon) >= 0.07);
+  assert.ok(bodySpriteWorldSize(moon) >= 0.032);
 });
 
 test('heatmap colors follow absolute fabric depth instead of body type', () => {

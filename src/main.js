@@ -4,6 +4,7 @@ import { Vec3 } from './core/math.js';
 import { BodyType, createBody, SimulationState } from './core/simulation.js';
 import { UnitScale, UnitSystem } from './core/units.js';
 import { createPresets } from './core/presets.js';
+import { generatedBodyVisualMass } from './core/fabric.js';
 
 const canvas = document.querySelector('#scene');
 const renderer = new Renderer(canvas);
@@ -180,6 +181,7 @@ function spawnFromCamera() {
     name: `${type} ${state.bodies.length + 1}`,
     type,
     mass,
+    visualMass: generatedBodyVisualMass(type, mass),
     density,
     radius,
     position: camera.position.add(forward.scale(0.4)),
@@ -245,7 +247,10 @@ function formatStats(body) {
     `position: ${fmtVec(body.position)}`,
     `velocity: ${fmtVec(body.velocity)}`,
     `speed: ${fmt(body.velocity.length())}`,
-  ].join('\n');
+    `spin rate: ${fmt(body.spinRate ?? 0)}`,
+    `spin axis: ${fmtVec(body.spinAxis ?? Vec3.zero())}`,
+    body.tidallyLockedTo ? `tidally locked to: ${body.tidallyLockedTo}` : null,
+  ].filter(Boolean).join('\n');
 }
 
 function fmtVec(v) {

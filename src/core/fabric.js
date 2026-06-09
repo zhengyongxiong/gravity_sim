@@ -8,6 +8,17 @@ const VisualMassScale = {
   [BodyType.PARTICLE]: 0.00000003,
 };
 
+const GeneratedVisualMassFloor = {
+  [BodyType.STAR]: 0.08,
+  [BodyType.NEUTRON_STAR]: 0.12,
+  [BodyType.WHITE_DWARF]: 0.07,
+  [BodyType.PLANET]: 0.018,
+  [BodyType.PARTICLE]: 0.003,
+};
+
+const RippleSpeedThreshold = 1e-4;
+const RippleMassThreshold = 0.02;
+
 export function buildFabricGrid(bodies, settings) {
   const {
     size = 12,
@@ -118,16 +129,15 @@ function sampleFabricField(x, z, bodyFields, settings) {
 }
 
 function visualRippleEnabled(body) {
-  return body.glow
-    || body.type === BodyType.STAR
-    || body.type === BodyType.PLANET
-    || body.type === BodyType.NEUTRON_STAR
-    || body.type === BodyType.WHITE_DWARF;
+  return bodySpeed(body) > RippleSpeedThreshold && visualRippleMass(body) >= RippleMassThreshold;
 }
 
 function visualRippleMass(body) {
-  if (body.type === BodyType.PLANET) return Math.max(body.mass, visualGravityMass(body));
-  return body.mass;
+  if (body.type === BodyType.PLANET || body.type === BodyType.PARTICLE) return visualGravityMass(body);
+  if (body.glow || body.type === BodyType.STAR || body.type === BodyType.NEUTRON_STAR || body.type === BodyType.WHITE_DWARF) {
+    return Math.max(visualGravityMass(body), Math.min(body.mass, 1));
+  }
+  return visualGravityMass(body);
 }
 
 export function visualGravityMass(body) {
@@ -136,8 +146,28 @@ export function visualGravityMass(body) {
   return Math.max(0, body.mass * scale);
 }
 
+export function generatedBodyVisualMass(type, mass) {
+  const numericMass = Math.max(0, Number.isFinite(mass) ? mass : 0);
+  if (numericMass <= 0) return 0;
+  const scale = VisualMassScale[type] ?? VisualMassScale[BodyType.PARTICLE];
+  const scaledMass = numericMass * scale;
+  const floor = GeneratedVisualMassFloor[type] ?? GeneratedVisualMassFloor[BodyType.PARTICLE];
+  const massFactor = clamp(Math.cbrt(numericMass / 0.001), 0.35, 2.2);
+  return Math.max(scaledMass, floor * massFactor);
+}
+
 export function massHeatTier(mass) {
   return clamp((Math.log10(Math.max(mass, 1e-12)) + 8) / 8, 0, 1);
+}
+
+function bodySpeed(body) {
+  const velocity = body.velocity;
+  if (!velocity) return 0;
+  if (typeof velocity.length === 'function') return velocity.length();
+  const x = Number.isFinite(velocity.x) ? velocity.x : 0;
+  const y = Number.isFinite(velocity.y) ? velocity.y : 0;
+  const z = Number.isFinite(velocity.z) ? velocity.z : 0;
+  return Math.sqrt(x * x + y * y + z * z);
 }
 
 function createBodyField(body, step, softening) {
