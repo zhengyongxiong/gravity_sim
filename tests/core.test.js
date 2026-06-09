@@ -211,6 +211,41 @@ test('solar and lunar presets use readable science-inspired spacing', () => {
   assert.ok(sun.spinAxis.dot(solarEarth.spinAxis) > 0.9);
 });
 
+test('pythagorean chaos uses three compact stars while preserving the 3-4-5 mass ratio', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Pythagorean Chaos');
+  const masses = preset.bodies.map((body) => body.mass);
+  const visualMasses = preset.bodies.map((body) => visualGravityMass(body));
+
+  assert.deepEqual(preset.bodies.map((body) => body.type), [BodyType.STAR, BodyType.STAR, BodyType.STAR]);
+  assert.deepEqual(masses, [3, 4, 5]);
+  assert.deepEqual(visualMasses, [0.75, 1, 1.25]);
+  assert.ok(preset.bodies.every((body) => body.radius < 0.03));
+});
+
+test('pythagorean chaos compact star radii survive the first close encounter', () => {
+  const preset = createPresets().find((candidate) => candidate.title === 'Pythagorean Chaos');
+  const state = new SimulationState({
+    gravitationalConstant: 1,
+    softening: 0.018,
+    collisionEnabled: true,
+    despawnDistance: 1200,
+  });
+  state.setBodies(preset.bodies);
+  let closestDistance = Infinity;
+
+  for (let i = 0; i < 6 * 180; i += 1) {
+    for (let a = 0; a < state.bodies.length; a += 1) {
+      for (let b = a + 1; b < state.bodies.length; b += 1) {
+        closestDistance = Math.min(closestDistance, state.bodies[a].position.distanceTo(state.bodies[b].position));
+      }
+    }
+    state.step(1 / 180);
+  }
+
+  assert.equal(state.bodies.length, 3);
+  assert.ok(closestDistance < 0.12);
+});
+
 test('sun earth keeps physical orbit mass while using readable visual field mass', () => {
   const preset = createPresets().find((candidate) => candidate.title === 'Sun and Earth');
   const [sun, earth] = preset.bodies;

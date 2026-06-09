@@ -278,6 +278,15 @@ test('sun earth preset keeps the planet visibly smaller than the star', () => {
   assert.ok(bodySpriteWorldSize(sun) > bodySpriteWorldSize(earth) * 10);
 });
 
+test('pythagorean chaos stars render as compact suns', () => {
+  const pythagorean = createPresets().find((candidate) => candidate.title === 'Pythagorean Chaos');
+  const [sun] = createPresets().find((candidate) => candidate.title === 'Sun and Earth').bodies;
+  const sizes = pythagorean.bodies.map((body) => bodySpriteWorldSize(body));
+
+  assert.ok(sizes.every((size) => size < bodySpriteWorldSize(sun) * 0.25));
+  assert.ok(sizes.every((size) => size >= 0.1));
+});
+
 test('heatmap color ramp is saturated for deep wells', () => {
   const hot = heatColorForDepth(3, 3);
   const cool = heatColorForDepth(0.02, 3);

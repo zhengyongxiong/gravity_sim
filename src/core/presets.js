@@ -47,11 +47,11 @@ export function createPresets() {
     },
     {
       title: 'Pythagorean Chaos',
-      classification: 'chaotic bound-to-ejection transition',
+      classification: 'chaotic three-star close-encounter system',
       bodies: [
-        createBody({ name: '3', type: BodyType.STAR, mass: 3, radius: 0.08, position: new Vec3(1, 0, 0), velocity: Vec3.zero(), color: [255, 230, 180] }),
-        createBody({ name: '4', type: BodyType.PLANET, mass: 4, radius: 0.07, position: new Vec3(-2, 0, 0), velocity: Vec3.zero(), color: [140, 180, 255] }),
-        createBody({ name: '5', type: BodyType.PLANET, mass: 5, radius: 0.09, position: new Vec3(1, 0, 3), velocity: Vec3.zero(), color: [255, 160, 120] }),
+        createBody({ name: 'Pythagoras 3', type: BodyType.STAR, mass: 3, visualMass: 0.75, radius: 0.018, position: new Vec3(1, 0, 0), velocity: Vec3.zero(), color: [255, 224, 170] }),
+        createBody({ name: 'Pythagoras 4', type: BodyType.STAR, mass: 4, visualMass: 1, radius: 0.021, position: new Vec3(-2, 0, 0), velocity: Vec3.zero(), color: [255, 242, 205] }),
+        createBody({ name: 'Pythagoras 5', type: BodyType.STAR, mass: 5, visualMass: 1.25, radius: 0.024, position: new Vec3(1, 0, 3), velocity: Vec3.zero(), color: [255, 205, 150] }),
       ],
     },
     {

@@ -639,7 +639,7 @@ function bodyPointSize(body, style) {
 }
 
 export function bodySpriteWorldSize(body, style = bodyStyle(body)) {
-  if (style === 1) return Math.max(0.54, body.radius * 4.2);
+  if (style === 1) return Math.max(0.1, body.radius * 4.2);
   if (style === 2) return Math.max(0.052, body.radius * 3);
   if (style === 3) return Math.max(0.045, body.radius * 2.2);
   if (style === 4) return Math.max(0.038, body.radius * 1.8);
